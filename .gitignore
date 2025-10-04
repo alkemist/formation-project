@@ -6,6 +6,12 @@
 .env
 .venv
 
-sqlite3.db
+data/formated/city_distances.csv
+data/formated/city_pairs.csv
+
+data/brut/*
+data/formated/city_distances
+data/formated/city_pairs
+data/formated/backup
 
 __pycache__

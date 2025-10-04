@@ -1,8 +1,16 @@
 import streamlit as st
+from formation.data.pages import list_pages
 
 st.header('Projet de formation')
 
-from formation.data.pages import list_pages
+st.set_page_config(layout="wide")
+
+st.html("""<style>
+    .stMain > .stMainBlockContainer{
+        padding-top: 3rem;
+        padding-bottom: 2rem;
+    }
+</style>""")
 
 pg = st.navigation(
     [ st.Page('formation/pages/home.py', title='Accueil', icon="🏠") ]

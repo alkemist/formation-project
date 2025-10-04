@@ -1,0 +1,30 @@
+Pour N ville il y a N! chemins possibles pour passer par toutes les villes 
+- 3: 	     				  1
+- 4: 	     				  3
+- 5: 	    				 12
+- 6: 	    				 60
+- 7:       					360
+- 8: 					 2  520
+- 9: 					 20 160
+- 10:  					181 440
+...
+- 19: 	121 645 100 408 832 000 	
+
+Listes des fichiers en nombre de villes :
+- 19
+- 91
+- 106
+- 112
+- 180
+- 204
+- 255
+
+1er ligne : 
+ - nombre de villes N sans compté le dépot (point de départ)
+ - quantité maximale que le camion peut transporter
+2e ligne : 
+ - indice du dépot
+N+1 lignes suivantes : distances entre chaque villes (i/j)
+N lignes suivantes : 
+ - indice de la ville :
+ - quantités de marchandises demandées pour la ville
