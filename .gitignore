@@ -14,4 +14,7 @@ data/formated/city_distances
 data/formated/city_pairs
 data/formated/backup
 
+notebooks/data/
+notebooks/export/
+
 __pycache__

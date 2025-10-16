@@ -1,0 +1,51 @@
+On liste N points aléatoires
+On calcul les distances entre chaque points
+On affiche le résultat sur une carte
+
+1er essaie :
+    Etapes :
+        - (1) Pour chaque point trouver le point le plus proche
+    Résultats :
+        - Chemin absurde
+    Raisons :
+        - Au fur et à mesure les nombres de choix diminue et les choix deviennent de plus en plus absure
+        - Ne prend pas en compte le regroupement des points
+
+2e essaie :
+    Etapes :
+        - On calcul une matrice X,Y grace aux distances
+        - On regroupe les points pour les regrouper par densité
+        - On détermine pour chaque couche le meilleur nombre de groupe, et méthode de regroupements
+        - On repars de la dernière couche :
+            - on applique la technique (1) aux centres de chaque groupe pour déterminer l'ordre des groupes
+            - pour chaque groupe on détermine les points qui sont les plus proche et qui serviront de ponts
+            - entre les ponts on applique la technique (1)
+    Résultats :
+        - Nombreuses portions de chemins absurdes
+    Raisons :
+        - La technique (1) génère des absurdités qui augmentent au fil des couches
+
+3e essaie :
+    Etapes :
+        - On suit les étapes précédentes, sauf qu'on découpent beaucoup plus et sans analyse du k
+        - On fait en sorte que chaque groupes ne contiennent que 3 points maximum
+        - On repars de la dernière couche :
+            - Pour chaque couche on détermine tout les ponts possibles entre les groupes
+            - Et pour chaque groupe, toutes les possibilités entre chaque extrémités des ponts
+            - On calcul le meilleur chemin possible, ce qui détermine l'ordre des groupes de la couche suivante
+    Résultats :
+        - Les calculs des premières couches explosent en temps et en mémoire
+    Raisons:
+        - Le nombre important de groupes fait que le nombre de combinaisons devient trop important
+
+4e essaie :
+    Etapes :
+        - On suit les étapes précédentes
+        - Quand le nombre de combinaisons sont en dessous de 20 000 on calcul le meilleur chemin possible
+        - Sinon on fait des inversions d'ordre entre 2 points consécutifs dans le même groupe
+    Résultats :
+        - Jusqu'à 70 points ce sont juste les 2 premières couches (sur 6) qui sont mal optimisées
+        - Plus on augmente ce nombre, plus ça augmente le nombre de couche sous optimisées
+        - Pour 300 points seuls 3 sont optimisés sur 9 couches
+    Raisons :
+        - Il faudrait pouvoir faire des permutations entre clusters

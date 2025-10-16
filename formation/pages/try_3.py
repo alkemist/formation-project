@@ -5,7 +5,7 @@ from formation.data.pages import list_pages
 from formation.data.map import DF_CITIES
 from formation.helpers.map import calcul_min_path, \
     calcul_distances, calcul_centroids, map_draw, draw_markers, map_start, map_clear, draw_scores, draw_kmeans, \
-    draw_gaussian, draw_centroids
+    draw_gaussian, draw_centroids, map_prepare
 
 st.title(list_pages['try_3']['title'])
 st.set_page_config(
@@ -15,6 +15,8 @@ st.set_page_config(
 )
 
 st.subheader(f'Etape 1')
+
+map_prepare(0)
 
 top_left, top_middle, top_right = st.columns([1, 2, 2])
 
@@ -29,24 +31,24 @@ with top_left:
     city_count = form_left.slider(
         "Nombre de ville :",
         min_value=3,
-        max_value=70,
+        max_value=250,
         step=1,
         label_visibility='collapsed'
     )
 
     b1, b2, b3 = form_right.columns([2, 1, 1], vertical_alignment='center')
 
-    if b1.button("Calcul", type="primary", use_container_width=True):
+    if b1.button("Calcul", type="primary", use_container_width=True, key=f"btn_calcul_0"):
         df_cities_random = DF_CITIES.sample(city_count)
         map_clear(0)
 
         st.session_state[f"df_points_0"], df_points_distances = calcul_distances(df_cities_random)
         draw_markers(0, st.session_state[f"df_points_0"])
 
-    if b2.button(label="", type="tertiary", icon=":material/replay:"):
+    if b2.button(label="", type="tertiary", icon=":material/replay:", key=f"btn_reset_0"):
         map_clear(0)
 
-    if b3.button(label="", type="tertiary", icon=":material/home:"):
+    if b3.button(label="", type="tertiary", icon=":material/home:", key=f"btn_home_0"):
         map_start(0)
 
     if f"df_points_0" in st.session_state and st.session_state[f"df_points_0"] is not None:
@@ -66,17 +68,21 @@ with top_middle:
     if f"df_points_0" in st.session_state and st.session_state[f"df_points_0"] is not None:
         middle_left, middle_right = st.columns([1, 1], vertical_alignment='center')
         middle_left.text("Selection de l'algo :")
-        st.session_state['clustering_algo_0'] = middle_right.selectbox(
+        clustering_algo_0 = middle_right.selectbox(
             "",
             ("kmeans", "gaussian"),
             label_visibility='collapsed',
             key=f'select_algo_0'
         )
 
-        if f"n_clusters_{st.session_state['clustering_algo_0']}_0" in st.session_state:
-            st.session_state[f"df_points_0"]["cluster"] = st.session_state[f"df_points_0"][f"cluster_{st.session_state['clustering_algo_0']}"]
+        if st.session_state['clustering_algo_0'] != clustering_algo_0:
+            st.session_state['clustering_algo_0'] = clustering_algo_0
 
-        draw_markers(0, st.session_state[f"df_points_0"])
+            st.session_state[f"df_points_0"]["cluster"] = st.session_state[f"df_points_0"][f"cluster_{st.session_state['clustering_algo_0']}"]
+            st.session_state[f"df_centroids_0"], df_centroids_distances = calcul_centroids(st.session_state[f"df_points_0"])
+
+            draw_centroids(0, st.session_state[f"df_centroids_0"])
+            draw_markers(0, st.session_state[f"df_points_0"])
 
 with top_right:
     if f"df_points_0" in st.session_state and st.session_state[f"df_points_0"] is not None:
@@ -84,10 +90,13 @@ with top_right:
         st.dataframe(st.session_state[f"df_points_0"])
 
         st.text('Centres')
-        st.session_state[f"df_centroids_0"], df_centroids_distances = calcul_centroids(st.session_state[f"df_points_0"])
-        st.dataframe(st.session_state[f"df_centroids_0"])
 
+        if st.session_state[f"df_centroids_0"] is None:
+            st.session_state[f"df_centroids_0"], df_centroids_distances = calcul_centroids(st.session_state[f"df_points_0"])
+
+        st.dataframe(st.session_state[f"df_centroids_0"])
         draw_centroids(0, st.session_state[f"df_centroids_0"])
+        draw_markers(0, st.session_state[f"df_points_0"])
 
     # st.text('Meilleur chemin')
     # df_points_best = calcul_min_path(df_points, df_points_distances)
@@ -110,11 +119,16 @@ if st.session_state[f"df_centroids_{i - 1}"] is not None:
     while st.session_state[f"df_centroids_{i - 1}"] is not None and st.session_state[f"df_centroids_{i - 1}"].shape[0] > 1:
         st.subheader(f'Etape {i + 1}')
 
-        st.session_state[f"df_points_{i}"] = st.session_state[f"df_centroids_{i - 1}"]
+        map_prepare(i)
+
+        st.session_state[f"df_points_{i}"] = st.session_state[f"df_centroids_{i - 1}"].copy()
 
         left, middle, right = st.columns([1, 2, 2])
 
         with left:
+            if left.button(label="", type="tertiary", icon=":material/home:", key=f"btn_home_{i}"):
+                map_start(i)
+
             left.plotly_chart(
                 draw_scores(st.session_state[f"df_points_{i}"]),
                 key=f'fig_clusters_{i}'
@@ -129,31 +143,40 @@ if st.session_state[f"df_centroids_{i - 1}"] is not None:
         with middle:
             middle_left, middle_right = st.columns([1, 1], vertical_alignment='center')
             middle_left.text("Selection de l'algo :")
-            st.session_state['clustering_algo_{i}'] = middle_right.selectbox(
+            clustering_algo = middle_right.selectbox(
                 "",
                 ("kmeans", "gaussian"),
                 label_visibility='collapsed',
                 key=f'select_algo_{i}'
             )
 
-            if f"n_clusters_{st.session_state['clustering_algo_{i}']}_{i}" in st.session_state:
-                st.session_state[f"df_points_{i}"]["cluster"] = st.session_state[f"df_points_{i}"][f"cluster_{st.session_state['clustering_algo_{i}']}"]
+            if st.session_state[f'clustering_algo_{i}'] != clustering_algo:
+                st.session_state[f'clustering_algo_{i}'] = clustering_algo
 
-            draw_markers(0, st.session_state[f"df_points_0"])
+                st.session_state[f"df_points_{i}"]["cluster"] = st.session_state[f"df_points_{i}"][f"cluster_{st.session_state[f'clustering_algo_{i}']}"]
+                st.session_state[f"df_centroids_{i}"], df_centroids_distances = calcul_centroids(st.session_state[f"df_points_{i}"], False)
 
-        with middle:
-            map_draw(i)
-            draw_markers(i, st.session_state[f"df_points_{i}"])
+                draw_centroids(i, st.session_state[f"df_centroids_{i}"])
+                draw_markers(i, st.session_state[f"df_points_{i}"])
 
         with right:
             st.text('Villes')
             st.dataframe(st.session_state[f"df_points_{i}"])
 
             st.text('Centres')
-            st.session_state[f"df_centroids_{i}"], df_centroids_distances = calcul_centroids(st.session_state[f"df_points_{i}"])
-            st.dataframe(st.session_state[f"df_centroids_{i}"])
 
-            draw_centroids(0, st.session_state[f"df_centroids_{i}"])
+            if st.session_state[f"df_centroids_{i}"] is None:
+                st.session_state[f"df_centroids_{i}"], df_centroids_distances = calcul_centroids(st.session_state[f"df_points_{i}"], False)
+
+            st.dataframe(st.session_state[f"df_centroids_{i}"])
+            draw_centroids(i, st.session_state[f"df_centroids_{i}"])
+            draw_markers(i, st.session_state[f"df_points_{i}"])
+
+        with middle:
+            map_draw(i)
+
+            # draw_centroids(i, st.session_state[f"df_centroids_{i}"])
+            # draw_markers(i, st.session_state[f"df_points_{i}"])
 
         i += 1
 
