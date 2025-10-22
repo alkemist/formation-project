@@ -3,8 +3,7 @@ import pandas as pd
 
 from formation.data.pages import list_pages
 from formation.data.map import DF_CITIES
-from formation.helpers.map import calcul_min_path, \
-    calcul_distances, calcul_centroids, map_draw, draw_markers, map_start, map_clear, draw_scores, draw_kmeans, \
+from formation.helpers.old.map import calcul_distances, calcul_centroids, map_draw, draw_markers, map_start, map_clear, draw_scores, draw_kmeans, \
     draw_gaussian, draw_centroids, map_prepare
 
 st.title(list_pages['try_3']['title'])

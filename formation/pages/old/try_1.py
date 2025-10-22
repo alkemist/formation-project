@@ -5,7 +5,7 @@ from streamlit_folium import st_folium
 
 from formation.data.pages import list_pages
 from formation.data.map import CENTER_START, ZOOM_START
-from formation.helpers.map import map_center, map_reset, map_init, random_cities
+from formation.helpers.old.map import map_center, map_reset, map_init, random_cities
 
 st.title(list_pages['try_1']['title'])
 st.set_page_config(

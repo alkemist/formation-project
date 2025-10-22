@@ -1,17 +1,21 @@
 list_pages = {
-    "try_1": {
-        'link': "formation/pages/try_1.py",
-        'title': "1ere méthode",
-        'icon': ":material/timer_1:"
+    "batches": {
+        'link': "formation/pages/batches.py",
+        'title': "Liste des lots",
+        'icon': ":material/transition_dissolve:",
+        'description': 'Liste des lots',
+        'url': "/batches",
     },
-    "try_2": {
-        'link': "formation/pages/try_2.py",
-        'title': "2e méthode",
-        'icon': ":material/timer_2:"
+    "batch": {
+        'link': "formation/pages/batch.py",
+        'title': "Lot",
+        'icon': ":material/deployed_code:",
+        'description': "Affichage d'un lot",
     },
-    "try_3": {
-        'link': "formation/pages/try_3.py",
-        'title': "3e méthode",
-        'icon': ":material/timer_3:"
+    "layer": {
+        'link': "formation/pages/layer.py",
+        'title': "Couche",
+        'icon': ":material/layers:",
+        'description': "Affichage d'une couche",
     },
 }

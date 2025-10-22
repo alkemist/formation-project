@@ -17,4 +17,6 @@ data/formated/backup
 notebooks/data/
 notebooks/export/
 
+export/
+
 __pycache__

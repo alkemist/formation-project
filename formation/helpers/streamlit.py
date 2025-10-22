@@ -1,365 +1,142 @@
-import streamlit as st
-import numpy as np
-import pandas as pd
-import plotly.express as px
-from sklearn.manifold import MDS
-import folium
 import random
+from typing import Type, Callable
+
+import pandas as pd
+import streamlit as st
+from sqlalchemy import select, delete
+from sqlalchemy.exc import NoResultFound
+
+from formation import session, Base, engine
+from formation.data.map import CENTER_START, ZOOM_START
+from formation.data.pages import list_pages
+
+from folium import CircleMarker, PolyLine, Map, FeatureGroup
 from shapely import MultiPoint, centroid
-from sklearn.preprocessing import StandardScaler
-from streamlit.delta_generator import DeltaGenerator
-from streamlit_folium import st_folium
-from sklearn.cluster import KMeans
-from sklearn.mixture import GaussianMixture
-from formation.data.map import DF_CITIES,  COLORS, CENTER_START, ZOOM_START, MIN_LAT, MAX_LAT, MIN_LNG, MAX_LNG
 
 
-def map_init():
-    if "center" not in st.session_state:
-        st.session_state["center"] = CENTER_START
-    if "zoom" not in st.session_state:
-        st.session_state["zoom"] = ZOOM_START
-    if "city_count" not in st.session_state:
-        st.session_state["city_count"] = None
-    if "markers_city" not in st.session_state:
-        st.session_state["markers_city"] = []
-    if "markers_city" not in st.session_state:
-        st.session_state["markers_lines"] = []
-    if "distances" not in st.session_state:
-        st.session_state["distances"] = None
+def redirect_with_error(page: str, e: Exception):
+    st.session_state['error'] = e
+    st.switch_page(list_pages[page]['link'])
 
-    if "city_tours" not in st.session_state:
-        st.session_state["city_tours"] = None
+def goto_page_object(page: str, object_key: str, object_id: int):
+    st.session_state[object_key] = object_id
+    st.switch_page(list_pages[page]['link'])
 
-    if "cities" not in st.session_state:
-        st.session_state["cities"] = None
-    if "markers_center" not in st.session_state:
-        st.session_state["markers_center"] = []
-    if "centers" not in st.session_state:
-        st.session_state["centers"] = None
-    if "clustering_algo" not in st.session_state:
-        st.session_state["clustering_algo"] = None
-    if "n_clusters_kmeans" not in st.session_state:
-        st.session_state["n_clusters_kmeans"] = 1
-    if "n_clusters_gaussian" not in st.session_state:
-        st.session_state["n_clusters_gaussian"] = 1
+def get_page_object(class_: Type[Base], object_key, page_error):
+    try:
+        if object_key in st.query_params:
+            object_id = int(st.query_params[object_key])
+        elif object_key in st.session_state:
+            object_id = int(st.session_state[object_key])
+        else:
+            raise KeyError('Aucun "{}" sélectionné'.format(object_key))
 
-def map_reset():
-    st.session_state["city_count"] = None
-    st.session_state["markers_city"] = []
-    st.session_state["markers_center"] = []
-    st.session_state["markers_lines"] = []
-    st.session_state["distances"] = None
+        return session.scalars(select(class_).where(class_.id == object_id)).one()
 
-    st.session_state["city_tours"] = None
+    except (KeyError, TypeError, ValueError, NoResultFound) as e:
+        redirect_with_error(page_error, e)
 
-    st.session_state["cities"] = None
-    st.session_state["centers"] = None
-    st.session_state["n_clusters_kmeans"] = 1
-    st.session_state["n_clusters_gaussian"] = 1
+def confirm_delete(class_: Type[Base], object_id, page_end):
+    with engine.connect() as conn:
+        conn.execute(
+            delete(class_).filter(class_.id == object_id)
+        )
+
+        conn.commit()
+
+    st.switch_page(list_pages[page_end]['link'])
 
 def map_center():
     st.session_state["zoom"] = ZOOM_START + random.uniform(0.00001, 0.00009)
     st.session_state["center"] = [
         CENTER_START[0] + random.uniform(0.00001, 0.00009),
         CENTER_START[1] + random.uniform(0.00001, 0.00009),
-        ]
+    ]
 
-def draw_markers(map_index: int, df_points: pd.DataFrame):
-    st.session_state[f"markers_point_{map_index}"] = []
+def map_draw(df_points: pd.DataFrame, column_color: str|None = None):
+    m = Map(
+        location=st.session_state["center"] if "center" in st.session_state else CENTER_START,
+        zoom_start=st.session_state["zoom"] if "zoom" in st.session_state else ZOOM_START,
+    )
 
-    for index, row in df_points.iterrows():
-        st.session_state[f"markers_point_{map_index}"].append(
-            folium.CircleMarker(
-                location=[
-                    row['lat'],
-                    row['lng'],
-                ],
-                tooltip=f"{index} ({row['cluster']})",
-                fill=True,
-                color=COLORS[int(row['cluster'])],
-                weight=0,
-                fill_opacity=0.6,
-                radius=15,
-            )
-        )
+    colors = generate_colors(df_points[column_color].unique().shape[0]) if column_color is not None else None
 
-        if 'next' in df_points.columns:
-            city_next = df_points.loc[row['next']:row['next']]
+    fg = FeatureGroup(name="Markers")
 
-            st.session_state[f"markers_line_{map_index}"].append(
-                folium.PolyLine(
-                    locations=[
-                        [row['lat'], row['lng']],
-                        [city_next['lat'].values[0], city_next['lng'].values[0]],
+    for i, point in df_points.iterrows():
+        if 'lat' in point and 'lng' in point:
+            fg.add_child(
+                CircleMarker(
+                    location=[
+                        point['lat'],
+                        point['lng'],
                     ],
-                    color="#000000",
-                    weight=3,
+                    tooltip=f"{point['code']} ({point[column_color]}" if column_color is not None else point['code'],
+
+                    # border
+                    # color='black',
+                    # opacity=0.6,
+                    # weight=5,
+
+                    # fill
+                    fill=True,
+                    fill_color=colors[int(point[column_color])] if column_color is not None else 'blue',
+                    fill_opacity=0.6,
+                    radius=15,
                 )
             )
 
-def calcul_centroids(df_points: pd.DataFrame, reset_clusters = True):
-    clusters = df_points['cluster'].unique()
-    k = len(clusters)
-
-    df_centroids = pd.DataFrame({
-        'lat': [0] * k,
-        'lng': [0] * k
-    }, index=clusters)
-
-    df_centroids['lat'] = df_centroids['lat'].astype(float)
-    df_centroids['lng'] = df_centroids['lng'].astype(float)
-
-    for i in clusters:
-        points = df_points[df_points['cluster'] == str(i)].loc[:, ['lat', 'lng']].to_numpy()
-        c = centroid(MultiPoint(points))
-        df_centroids.loc[i:i, 'lat'] = c.x
-        df_centroids.loc[i:i, 'lng'] = c.y
-
-    return calcul_distances(df_centroids, reset_clusters = True)
-
-def draw_centroids(map_index: int, df_centers: pd.DataFrame):
-    st.session_state[f"markers_center_{map_index}"] = []
-
-    for index, row in df_centers.iterrows():
-        st.session_state[f"markers_center_{map_index}"].append(
-            folium.CircleMarker(
-                location=[
-                    row['lat'],
-                    row['lng'],
-                ],
-                tooltip=str(index),
-                fill=False,
-                color=COLORS[int(index)],
-                weight=5,
-                opacity=1,
-                radius=10,
+        if 'lat_next' in point and 'lng_next' in point:
+            fg.add_child(
+                PolyLine(
+                    locations=[
+                        [point['lat'], point['lng']],
+                        [point['lat_next'], point['lng_next']],
+                    ],
+                    color="black",
+                    weight=4,
+                )
             )
-        )
 
-def draw_scores(df_points: pd.DataFrame):
-    measures = {
-        'kmeans': [],
-        'gaussian': []
-    }
+    m.add_child(fg)
 
-    n_clusters_list = range(
-        1,
-        min(
-            df_points.shape[0],
-            len(COLORS) - 1
-        ) + 1
-    )
+    return m
 
-    points = df_points.loc[:,['x', 'y']].to_numpy()
+def generate_colors(n: int) -> list[str]:
+    hex_colors = []
 
-    for k in n_clusters_list:
-        kmeans = KMeans(n_clusters=k)
-        gaussian = GaussianMixture(n_components=k, random_state=42)
+    if n == 1:
+        return ['blue']
 
-        kmeans.fit(points)
-        gaussian.fit(points)
+    luminosity_step = 255 / (n - 1)
 
-        measures['kmeans'].append(kmeans.inertia_)
-        measures['gaussian'].append(gaussian.bic(points))
+    # Define the range of values [0-255]
+    value_range = range(n)
 
-    measures['kmeans'] = StandardScaler().fit_transform(np.array(measures['kmeans']).reshape(-1, 1)).reshape(-1)
-    measures['gaussian'] = StandardScaler().fit_transform(np.array(measures['gaussian']).reshape(-1, 1)).reshape(-1)
+    for i in value_range:
+        grayscale_value = round(i * luminosity_step)
 
-    fig = px.line(
-        pd.DataFrame(measures, index=n_clusters_list),
-        title='Méthode du Coude',
-        labels={
-            'index': 'Nombre de Clusters',
-            'value': "Score",
-        },
-    )
-    fig.update_layout(showlegend=True)
+        component_value = grayscale_value
 
-    return fig
+        component_value = max(0, min(255, component_value))
 
-def map_prepare(map_index: int):
+        hex_component = f'{component_value:02X}'
 
-    if f"center_{map_index}" not in st.session_state:
-        st.session_state[f"center_{map_index}"] = CENTER_START
-    if f"zoom_{map_index}" not in st.session_state:
-        st.session_state[f"zoom_{map_index}"] = ZOOM_START
+        hex_code = f"#{hex_component}{hex_component}{hex_component}"
 
-    if f"markers_point_{map_index}" not in st.session_state:
-        st.session_state[f"markers_point_{map_index}"] = []
-    if f"markers_center_{map_index}" not in st.session_state:
-        st.session_state[f"markers_center_{map_index}"] = []
-    if f"markers_line_{map_index}" not in st.session_state:
-        st.session_state[f"markers_line_{map_index}"] = []
+        hex_colors.append(hex_code)
 
-    if f"clustering_algo_{map_index}" not in st.session_state:
-        st.session_state[f"clustering_algo_{map_index}"] = 'kmeans'
-    if f"n_clusters_kmeans_{map_index}" not in st.session_state:
-        st.session_state[f"n_clusters_kmeans_{map_index}"] = 1
-    if f"n_clusters_gaussian_{map_index}" not in st.session_state:
-        st.session_state[f"n_clusters_gaussian_{map_index}"] = 1
-
-    if f"df_points_{map_index}" not in st.session_state:
-        st.session_state[f"df_points_{map_index}"] = None
-    if f"df_centroids_{map_index}" not in st.session_state:
-        st.session_state[f"df_centroids_{map_index}"] = None
-
-def map_clear(map_index: int):
-    map_start(map_index)
-
-    st.session_state[f"markers_point_{map_index}"] = []
-    st.session_state[f"markers_center_{map_index}"] = []
-    st.session_state[f"markers_line_{map_index}"] = []
-
-    st.session_state[f"clustering_algo_{map_index}"] = 'kmeans'
-    st.session_state[f"n_clusters_kmeans_{map_index}"] = 1
-    st.session_state[f"n_clusters_gaussian_{map_index}"] = 1
-
-    st.session_state[f"df_points_{map_index}"] = None
-    st.session_state[f"df_centroids_{map_index}"] = None
+    return hex_colors
 
 
-def map_start(map_index: int):
-    st.session_state[f"zoom_{map_index}"] = ZOOM_START + random.uniform(0.00001, 0.00009)
-    st.session_state[f"center_{map_index}"] = [
-        CENTER_START[0] + random.uniform(0.00001, 0.00009),
-        CENTER_START[1] + random.uniform(0.00001, 0.00009),
-        ]
 
-def map_draw(map_index: int = 0):
-    m = folium.Map(
-        location=CENTER_START,
-        zoom_start=ZOOM_START,
-        min_zoom=ZOOM_START,
-        max_bounds=True,
-        min_lat=MIN_LAT,
-        max_lat=MAX_LAT,
-        min_lon=MIN_LNG,
-        max_lon=MAX_LNG,
-    )
+@st.dialog("Confirmation")
+def confirm(callback: Callable, class_: Type[Base], object_id, page_end):
+    st.write(f"Etes vous sûr ?")
+    button_left, button_right = st.columns([1,1])
+    if button_left.button("Non"):
+        st.rerun()
 
-    fg = folium.FeatureGroup(name="Markers")
-
-    folium.PolyLine(
-        locations=[
-            [MIN_LAT, MIN_LNG],
-            [MAX_LAT, MIN_LNG],
-            [MAX_LAT, MAX_LNG],
-            [MIN_LAT, MAX_LNG],
-            [MIN_LAT, MIN_LNG],
-        ],
-        color="#FF0000",
-        weight=2,
-    ).add_to(fg)
-
-    for marker in st.session_state[f"markers_point_{map_index}"]:
-        fg.add_child(marker)
-
-    for marker in st.session_state[f"markers_center_{map_index}"]:
-        fg.add_child(marker)
-
-    for marker in st.session_state[f"markers_line_{map_index}"]:
-        fg.add_child(marker)
-
-    st_folium(
-        m,
-        center=st.session_state[f"center_{map_index}"],
-        zoom=st.session_state[f"zoom_{map_index}"],
-        width='100%',
-        feature_group_to_add=fg,
-        returned_objects=['center', 'zoom'],
-        key=f"map_{map_index}",
-    )
-
-def prepare_clustering(map_index: int, el: DeltaGenerator, algo_type: str):
-    n_clusters_list = range(
-        1,
-        min(
-            st.session_state[f"df_points_{map_index}"].shape[0],
-            len(COLORS) - 1
-        ) + 1
-    )
-
-    k = el.slider(
-        f"Nombre de clusters {algo_type} : ",
-        min_value=n_clusters_list[0],
-        max_value=n_clusters_list[-1],
-        step=1,
-        #label_visibility='collapsed',
-        key=f'k_{algo_type}_{map_index}',
-    )
-
-    return st.session_state[f"df_points_{map_index}"].loc[:,['x', 'y']].to_numpy(), k
-
-def finish_clustering(map_index: int, el: DeltaGenerator, algo_type: str):
-    st.session_state[f"df_points_{map_index}"][f'cluster_{algo_type}'] = \
-        st.session_state[f"df_points_{map_index}"][f'cluster_{algo_type}'].astype(str)
-
-    fig = px.scatter(
-        st.session_state[f"df_points_{map_index}"].reset_index(),
-        x='x',
-        y='y',
-        color=f'cluster_{algo_type}',
-        hover_name='index',
-        height=700,
-        size=[1] * st.session_state[f"df_points_{map_index}"].shape[0],
-        color_discrete_sequence=COLORS,
-    )
-
-    fig.update_yaxes(scaleanchor="x", scaleratio=1)
-
-    el.plotly_chart(fig, use_container_width=True, key=f'fig_{algo_type}_{map_index}')
-
-def draw_kmeans(map_index: int, el: DeltaGenerator):
-    # el.text('K-means')
-
-    points, k_kmeans = prepare_clustering(
-        map_index,
-        el,
-        'kmeans',
-    )
-
-    if st.session_state[f"n_clusters_kmeans_{map_index}"] != k_kmeans:
-        model_kmeans = KMeans(n_clusters=k_kmeans)
-        model_kmeans.fit(points)
-        st.session_state[f"df_points_{map_index}"]['cluster_kmeans'] = model_kmeans.predict(points)
-
-        if st.session_state[f'clustering_algo_{map_index}'] == 'kmeans':
-            st.session_state[f"df_points_{map_index}"]["cluster"] = st.session_state[f"df_points_{map_index}"][f"cluster_kmeans"]
-            st.session_state[f"df_points_{map_index}"]["cluster"] = st.session_state[f"df_points_{map_index}"]["cluster"].astype(str)
-
-            st.session_state[f"df_centroids_{map_index}"], df_centroids_distances = calcul_centroids(st.session_state[f"df_points_{map_index}"])
-            st.session_state[f"n_clusters_kmeans_{map_index}"] = k_kmeans
-
-    finish_clustering(
-        map_index,
-        el,
-        'kmeans',
-    )
-
-def draw_gaussian(map_index: int, el: DeltaGenerator):
-    # el.text('Gaussian Mixture')
-
-    points, k_gaussian = prepare_clustering(
-        map_index,
-        el,
-        'gaussian',
-    )
-
-    if st.session_state[f"n_clusters_gaussian_{map_index}"] != k_gaussian:
-        model_gaussian = GaussianMixture(n_components=k_gaussian, random_state=42)
-        model_gaussian.fit(points)
-        st.session_state[f"df_points_{map_index}"]['cluster_gaussian'] = model_gaussian.predict(points)
-
-        if st.session_state[f'clustering_algo_{map_index}'] == 'gaussian':
-            st.session_state[f"df_points_{map_index}"]["cluster"] = st.session_state[f"df_points_{map_index}"][f"cluster_gaussian"]
-            st.session_state[f"df_points_{map_index}"]["cluster"] = st.session_state[f"df_points_{map_index}"]["cluster"].astype(str)
-
-            st.session_state[f"df_centroids_{map_index}"], df_centroids_distances = calcul_centroids(st.session_state[f"df_points_{map_index}"])
-            st.session_state[f"n_clusters_gaussian_{map_index}"] = k_gaussian
-
-    finish_clustering(
-        map_index,
-        el,
-        'gaussian',
-    )
+    if button_right.button("Oui"):
+        callback(class_, object_id, page_end)
+        st.rerun()
