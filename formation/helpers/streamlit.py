@@ -53,13 +53,11 @@ def map_center():
         CENTER_START[1] + random.uniform(0.00001, 0.00009),
     ]
 
-def map_draw(df_points: pd.DataFrame, column_color: str|None = None):
+def map_draw(df_points: pd.DataFrame, column_color: str|None = None, dict_colors_fill: dict|None = None, dict_colors_border: dict|None = None):
     m = Map(
         location=st.session_state["center"] if "center" in st.session_state else CENTER_START,
         zoom_start=st.session_state["zoom"] if "zoom" in st.session_state else ZOOM_START,
     )
-
-    colors = generate_colors(df_points[column_color].unique().shape[0]) if column_color is not None else None
 
     fg = FeatureGroup(name="Markers")
 
@@ -71,29 +69,30 @@ def map_draw(df_points: pd.DataFrame, column_color: str|None = None):
                         point['lat'],
                         point['lng'],
                     ],
-                    tooltip=f"{point['code']} ({point[column_color]}" if column_color is not None else point['code'],
+                    tooltip=f"{point['code']} ({point[column_color]})" if column_color is not None else point['code'],
 
                     # border
-                    # color='black',
+                    color=dict_colors_border[int(point[column_color])] if column_color is not None else 'blue',
                     # opacity=0.6,
                     # weight=5,
 
                     # fill
                     fill=True,
-                    fill_color=colors[int(point[column_color])] if column_color is not None else 'blue',
-                    fill_opacity=0.6,
+                    fill_color=dict_colors_fill[int(point[column_color])] if column_color is not None else 'blue',
+                    fill_opacity=1,
                     radius=15,
                 )
             )
 
-        if 'lat_next' in point and 'lng_next' in point:
+        if point['lat_next'] is not None and point['lng_next'] is not None:
             fg.add_child(
                 PolyLine(
                     locations=[
                         [point['lat'], point['lng']],
                         [point['lat_next'], point['lng_next']],
                     ],
-                    color="black",
+                    color=dict_colors_fill[int(point[column_color])] if column_color is not None else 'blue',
+                    fill_color=dict_colors_fill[int(point[column_color])] if column_color is not None else 'blue',
                     weight=4,
                 )
             )

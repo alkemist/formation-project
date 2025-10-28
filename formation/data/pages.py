@@ -12,6 +12,12 @@ list_pages = {
         'icon': ":material/deployed_code:",
         'description': "Affichage d'un lot",
     },
+    "configuration": {
+        'link': "formation/pages/configuration.py",
+        'title': "Configuration",
+        'icon': ":material/manufacturing:",
+        'description': "Affichage d'une configuration",
+    },
     "layer": {
         'link': "formation/pages/layer.py",
         'title': "Couche",

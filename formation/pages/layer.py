@@ -2,6 +2,7 @@ import streamlit as st
 from streamlit_folium import st_folium
 
 from formation.data.pages import list_pages
+from formation.helpers.map import get_distances
 from formation.helpers.streamlit import map_center, map_draw
 from formation.helpers.streamlit import get_page_object, goto_page_object
 from formation.models.layer import Layer
@@ -28,7 +29,10 @@ title_left, title_middle, title_right = st.columns([1, 10, 1], vertical_alignmen
 title_middle.subheader('Liste des points')
 
 if title_left.button(icon=':material/arrow_back:', label='', type='tertiary'):
-    goto_page_object('batch', 'batch_id', layer.batch_id)
+    if layer.configuration is None:
+        goto_page_object('batch', 'batch_id', layer.batch_id)
+    else:
+        goto_page_object('configuration', 'configuration_id', layer.configuration_id)
 
 if title_right.button(icon=':material/my_location:', label='', type='tertiary'):
     map_center()
@@ -36,10 +40,12 @@ if title_right.button(icon=':material/my_location:', label='', type='tertiary'):
 col_left, col_middle, col_right = st.columns([4, 2, 6])
 
 with col_left:
+    # df_distances = get_distances(layer)
+    # st.dataframe(df_distances)
     pass
 
 col_middle.dataframe(
-    df_points[['code']],
+    df_points[['code', 'lat', 'lng']],
     column_config={
         "code": st.column_config.TextColumn(
             'Code',

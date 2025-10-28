@@ -9,23 +9,28 @@ from formation import engine
 from formation.data.pages import list_pages
 from formation.helpers.streamlit import redirect_with_error, get_page_object, goto_page_object, map_draw, map_center, \
     confirm, confirm_delete
-from formation.models import Batch, Point, Layer
+from formation.models import Batch, Point, Layer, Configuration
 
 batch = get_page_object(Batch, 'batch_id', 'batches')
 
-st_points = select(Batch, Layer, Point) \
-    .filter(Batch.id == Layer.batch_id) \
-    .filter(Layer.id == Point.layer_id) \
+st_configurations = select(Batch, Configuration, Layer) \
+    .filter(Batch.id == Configuration.batch_id) \
+    .filter(Configuration.id == Layer.configuration_id) \
     .filter(Batch.id == batch.id) \
-    .order_by(Layer.id)
+    .order_by(Configuration.id)
 
-df_points = pd.read_sql(st_points, engine) \
-    [['id', 'layer_id', 'level', 'code', 'lat', 'lng']]
+df_configurations = pd.read_sql(st_configurations, engine)\
+    [['clustering_type', 'clustering_length', 'clustering_params', 'distance_min', 'id_1', 'id_2']]\
+    .groupby(['id_1']) \
+    .agg(
+        clustering_type=('clustering_type', 'first'),
+        clustering_length=('clustering_length', 'first'),
+        clustering_params=('clustering_params', 'first'),
+        distance_min=('distance_min', 'first'),
+        count=('id_2', 'nunique'),
+).reset_index().rename(columns={'id_1': 'id'})
 
-df_layers = df_points[['layer_id', 'level', 'id']].groupby(['layer_id', 'level']).count().reset_index()\
-    .rename(columns={'id': 'count'})\
-    .rename(columns={'layer_id': 'id'})
-df_layers['link'] = '/layer?layer_id=' + df_layers['id'].astype(str)
+df_configurations['link'] = '/configuration?configuration_id=' + df_configurations['id'].astype(str)
 
 ################################################################################################################""
 
@@ -39,7 +44,7 @@ st.set_page_config(
 )
 
 title_left, title_middle, title_action_1, title_action_2 = st.columns([1, 9, 1, 1], vertical_alignment='bottom')
-title_middle.subheader('Liste des couches')
+title_middle.subheader('Liste des configurations')
 
 if title_left.button(icon=':material/arrow_back:', label='', type='tertiary'):
     switch_page(list_pages['batches']['link'])
@@ -50,17 +55,24 @@ if title_action_1.button(icon=':material/delete:', label='', type='tertiary'):
 if title_action_2.button(icon=':material/my_location:', label='', type='tertiary'):
     map_center()
 
-col_left, col_right = st.columns([6, 6])
-
-table_event = col_left.dataframe(
-    df_layers[['level', 'count', 'link']],
+table_event = st.dataframe(
+    df_configurations.drop(columns=['id']),
     column_config={
-        "level": st.column_config.NumberColumn(
-            'Couche',
+        "clustering_type": st.column_config.TextColumn(
+            'Type',
             pinned=True,
         ),
+        "clustering_length": st.column_config.NumberColumn(
+            'Longueur',
+        ),
+        "clustering_params": st.column_config.JsonColumn(
+            'Paramètres',
+        ),
+        "distance_min": st.column_config.NumberColumn(
+            'Distance',
+        ),
         "count": st.column_config.NumberColumn(
-            'Points',
+            'Couches',
         ),
         "link": st.column_config.LinkColumn(
             "Liste",
@@ -75,10 +87,3 @@ table_event = col_left.dataframe(
     selection_mode='multi-row',
     on_select="rerun",
 )
-
-table_event.selection.rows = [1]
-
-with col_right:
-    df_layers_filtered = df_layers.iloc[table_event.selection.rows]
-    df_points_filtered = df_points.loc[df_points['layer_id'].isin(df_layers_filtered['id'].unique())]
-    st_folium(map_draw(df_points_filtered, 'level'), width='100%')
