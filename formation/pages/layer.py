@@ -33,10 +33,12 @@ if title_left.button(icon=':material/arrow_back:', label='', type='tertiary'):
 if title_right.button(icon=':material/my_location:', label='', type='tertiary'):
     map_center()
 
+col_left, col_middle, col_right = st.columns([4, 2, 6])
 
-col_left, col_right = st.columns([6, 6])
+with col_left:
+    pass
 
-col_left.dataframe(
+col_middle.dataframe(
     df_points[['code']],
     column_config={
         "code": st.column_config.TextColumn(
