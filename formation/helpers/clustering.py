@@ -1,9 +1,8 @@
 import pandas as pd
 import numpy as np
-from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
 from shapely import MultiPoint, centroid
-
+from sklearn import cluster
 
 def precalcul_clusters(df_points: pd.DataFrame, size: int) :
     points = df_points.loc[:,['x', 'y']].to_numpy()
@@ -28,14 +27,14 @@ def postcalcul_clusters(df_points: pd.DataFrame, size: int, k: int):
 
     return df_points, points_by_cluster, k
 
-def calcul_clusters_kmeans(df_points: pd.DataFrame, size: int) :
+def calcul_clusters_kmeans(df_points: pd.DataFrame, size: int, params: dict) :
     points, k = precalcul_clusters(df_points, size)
     points_by_cluster = None
 
-    while points_by_cluster is None or points_by_cluster > size:
-        model_kmeans = KMeans(n_clusters=k)
-        model_kmeans.fit(points)
-        df_points['cluster'] = model_kmeans.predict(points)
+    while (points_by_cluster is None or points_by_cluster > size) and k < df_points.shape[0]:
+        model = cluster.KMeans(n_clusters=k, random_state=42, **params)
+        model.fit(points)
+        df_points['cluster'] = model.predict(points)
 
         df_points, points_by_cluster, k = postcalcul_clusters(df_points, size, k)
 
@@ -45,10 +44,114 @@ def calcul_clusters_gaussian(df_points: pd.DataFrame, size: int, params: dict) :
     points, k = precalcul_clusters(df_points, size)
     points_by_cluster = None
 
-    while points_by_cluster is None or points_by_cluster > size:
-        model_gaussian = GaussianMixture(n_components=k, random_state=42, **params)
-        model_gaussian.fit(points)
-        df_points['cluster'] = model_gaussian.predict(points)
+    while (points_by_cluster is None or points_by_cluster > size) and k < df_points.shape[0]:
+        model = GaussianMixture(n_components=k, random_state=42, **params)
+        model.fit(points)
+        df_points['cluster'] = model.predict(points)
+
+        df_points, points_by_cluster, k = postcalcul_clusters(df_points, size, k)
+
+    return df_points
+
+def calcul_clusters_dbscan(df_points: pd.DataFrame, size: int, params: dict) :
+    points, k = precalcul_clusters(df_points, size)
+    points_by_cluster = None
+
+    while (points_by_cluster is None or points_by_cluster > size) and k < df_points.shape[0]:
+        model = cluster.DBSCAN(min_samples=k, **params)
+        model.fit(points)
+        df_points['cluster'] = model.labels_
+
+        df_points, points_by_cluster, k = postcalcul_clusters(df_points, size, k)
+
+    return df_points
+
+def calcul_clusters_affinity(df_points: pd.DataFrame, size: int, params: dict) :
+    points, k = precalcul_clusters(df_points, size)
+    points_by_cluster = None
+
+    while (points_by_cluster is None or points_by_cluster > size) and k < df_points.shape[0]:
+        model = cluster.AffinityPropagation(random_state=42, **params)
+        model.fit(points)
+        df_points['cluster'] = model.predict(points)
+
+        df_points, points_by_cluster, k = postcalcul_clusters(df_points, size, k)
+
+    return df_points
+
+def calcul_clusters_meanshift(df_points: pd.DataFrame, size: int, params: dict) :
+    points, k = precalcul_clusters(df_points, size)
+    points_by_cluster = None
+
+    while (points_by_cluster is None or points_by_cluster > size) and k < df_points.shape[0]:
+        model = cluster.MeanShift(bandwidth=42, **params)
+        model.fit(points)
+        df_points['cluster'] = model.predict(points)
+
+        df_points, points_by_cluster, k = postcalcul_clusters(df_points, size, k)
+
+    return df_points
+
+def calcul_clusters_spectral(df_points: pd.DataFrame, size: int, params: dict) :
+    points, k = precalcul_clusters(df_points, size)
+    points_by_cluster = None
+
+    while (points_by_cluster is None or points_by_cluster > size) and k < df_points.shape[0]:
+        model = cluster.SpectralClustering(n_clusters=k, **params)
+        model.fit(points)
+        df_points['cluster'] = model.labels_
+
+        df_points, points_by_cluster, k = postcalcul_clusters(df_points, size, k)
+
+    return df_points
+
+def calcul_clusters_agglomerative(df_points: pd.DataFrame, size: int, params: dict) :
+    points, k = precalcul_clusters(df_points, size)
+    points_by_cluster = None
+
+    while (points_by_cluster is None or points_by_cluster > size) and k < df_points.shape[0]:
+        model = cluster.AgglomerativeClustering(n_clusters=k, **params)
+        model.fit(points)
+        df_points['cluster'] = model.labels_
+
+        df_points, points_by_cluster, k = postcalcul_clusters(df_points, size, k)
+
+    return df_points
+
+def calcul_clusters_hdbscan(df_points: pd.DataFrame, size: int, params: dict) :
+    points, k = precalcul_clusters(df_points, size)
+    points_by_cluster = None
+
+    while (points_by_cluster is None or points_by_cluster > size) and k < df_points.shape[0]:
+        model = cluster.HDBSCAN(min_cluster_size=k, **params)
+        model.fit(points)
+        df_points['cluster'] = model.labels_
+
+        df_points, points_by_cluster, k = postcalcul_clusters(df_points, size, k)
+
+    return df_points
+
+def calcul_clusters_optics(df_points: pd.DataFrame, size: int, params: dict) :
+    points, k = precalcul_clusters(df_points, size)
+    points_by_cluster = None
+
+    while (points_by_cluster is None or points_by_cluster > size) and k < df_points.shape[0]:
+        model = cluster.OPTICS(min_samples=k, **params)
+        model.fit(points)
+        df_points['cluster'] = model.labels_
+
+        df_points, points_by_cluster, k = postcalcul_clusters(df_points, size, k)
+
+    return df_points
+
+def calcul_clusters_birch(df_points: pd.DataFrame, size: int, params: dict) :
+    points, k = precalcul_clusters(df_points, size)
+    points_by_cluster = None
+
+    while (points_by_cluster is None or points_by_cluster > size) and k < df_points.shape[0]:
+        model = cluster.Birch(n_clusters=k, **params)
+        model.fit(points)
+        df_points['cluster'] = model.predict(points)
 
         df_points, points_by_cluster, k = postcalcul_clusters(df_points, size, k)
 

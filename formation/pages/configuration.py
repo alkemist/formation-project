@@ -5,12 +5,9 @@ from sqlalchemy.orm import Session
 from streamlit import switch_page
 from streamlit_folium import st_folium
 
-from formation import engine, session
-from formation.data.constants import BEST_PATH_MAX_CLUSTERS
+from formation import engine
 from formation.data.pages import list_pages
-from formation.helpers.clustering import calcul_centroids
-from formation.helpers.map import calcul_min_local_path, sort_points_by_cluster, best_path, get_distances
-from formation.helpers.streamlit import redirect_with_error, get_page_object, goto_page_object, map_draw, map_center, \
+from formation.helpers.streamlit import get_page_object, goto_page_object, map_draw, map_center, \
     confirm, confirm_delete, generate_colors
 from formation.models import Batch, Point, Layer, Configuration
 

@@ -4,8 +4,7 @@ import streamlit as st
 import pandas as pd
 
 from formation.data.constants import BEST_PATH_MAX_CLUSTERS
-from formation.helpers.clustering import precalcul_clusters, calcul_clusters_kmeans, calcul_clusters_gaussian, \
-    calcul_centroids
+from formation.helpers import clustering
 from formation.helpers.layer import save_layer
 from sqlalchemy import select
 from sqlalchemy.dialects.sqlite import insert
@@ -69,6 +68,41 @@ with tab_list:
 
 batch = None
 
+CLUSTERING_LGENTHS = [3]
+CLUSTERING_CONFIGURATIONS = {
+    'kmeans': {},
+    'gaussian': {
+        'covariance_type': ['full', 'tied', 'diag', 'spherical']
+    },
+    # 'dbscan': {
+    #     # 'eps': [0.5, 3, 5, 10]
+    # },
+    # 'hdbscan': {
+    #     # 'cluster_selection_epsilon': [0.5, 3, 5, 10],
+    #     # 'metric': ['euclidean', 'l1', 'l2', 'manhattan', 'cosine', 'precomputed'],
+    #     # 'algorithm': ['auto', 'brute', 'kd_tree', 'ball_tree'],
+    #     # 'cluster_selection_method': ['eom', 'leaf'],
+    # },
+    # 'affinity': {
+    #     # 'damping': [0.5, 1],
+    #     # 'affinity': ['euclidean', 'precomputed'],
+    # },
+    # 'meanshift': {},
+    'spectral': {},
+    'agglomerative': {
+        'linkage': ['ward', 'complete', 'average', 'single'],
+        # 'metric': ['euclidean', 'l1', 'l2', 'manhattan', 'cosine', 'precomputed'],
+    },
+    # 'optics': {
+    #     # 'metric': ['euclidean', 'l1', 'l2', 'manhattan', 'cosine', 'cityblock'],
+    #     # 'cluster_method': ['xi', 'dbscan'],
+    #     # 'algorithm': ['auto', 'ball_tree', 'kd_tree', 'brute'],
+    # },
+    'birch': {
+        'compute_labels': [True, False],
+    },
+}
+
 with tab_create:
     top_left, top_middle, top_right = st.columns([2, 1, 2])
 
@@ -114,17 +148,12 @@ with tab_create:
                             )
                         ).inserted_primary_key[0]
 
-                        clustering_lengths = [3]
-                        configurations = {
-                            'kmeans': {},
-                            'gaussian': {
-                                'covariance_type': ['full', 'tied', 'diag', 'spherical']
-                            }
-                        }
+                        for clustering_length in CLUSTERING_LGENTHS:
+                            n_clustering = 1
 
-                        for clustering_length in clustering_lengths:
-                            with st.spinner(f"Calcul de clusters de taille {clustering_length}", show_time=True):
-                                for clustering_type, params in configurations.items():
+                            for clustering_type, params in CLUSTERING_CONFIGURATIONS.items():
+                                with st.spinner(f"Calcul des clusters de taille {clustering_length} : {n_clustering} / {len(CLUSTERING_CONFIGURATIONS.items())}", show_time=True):
+
                                     param_names = list(params.keys())
                                     param_values_lists = list(params.values())
                                     all_combinations = list(itertools.product(*param_values_lists))
@@ -136,7 +165,8 @@ with tab_create:
                                         df_points_distances = df_distances_pairs.copy()
                                         iteration_params = dict(zip(param_names, combination_values))
 
-                                        with st.spinner(f"Cluster {clustering_type} avec comme paramètres {iteration_params} {n_combination} / {len(all_combinations)}", show_time=True):
+                                        str_params = f" avec comme paramètres {iteration_params}" if len(param_names) > 0 else ''
+                                        with st.spinner(f"Cluster {clustering_type}{str_params} : {n_combination} / {len(all_combinations)}", show_time=True):
 
                                             configuration_id = conn.execute(
                                                 insert(Configuration).values(
@@ -152,9 +182,30 @@ with tab_create:
                                             while True:
                                                 with st.spinner(f"Génération de la couche {layers_count}", show_time=True):
                                                     if clustering_type == 'kmeans':
-                                                        df_points_coords = calcul_clusters_kmeans(df_points_coords, clustering_length)
+                                                        df_points_coords = clustering.calcul_clusters_kmeans(df_points_coords, clustering_length, iteration_params)
                                                     elif clustering_type == 'gaussian':
-                                                        df_points_coords = calcul_clusters_gaussian(df_points_coords, clustering_length, iteration_params)
+                                                        df_points_coords = clustering.calcul_clusters_gaussian(df_points_coords, clustering_length, iteration_params)
+                                                    elif clustering_type == 'dbscan':
+                                                        df_points_coords = clustering.calcul_clusters_dbscan(df_points_coords, clustering_length, iteration_params)
+                                                    elif clustering_type == 'dbscan':
+                                                        df_points_coords = clustering.calcul_clusters_dbscan(df_points_coords, clustering_length, iteration_params)
+                                                    elif clustering_type == 'hdbscan':
+                                                        df_points_coords = clustering.calcul_clusters_hdbscan(df_points_coords, clustering_length, iteration_params)
+                                                    elif clustering_type == 'affinity':
+                                                        df_points_coords = clustering.calcul_clusters_affinity(df_points_coords, clustering_length, iteration_params)
+                                                    elif clustering_type == 'meanshift':
+                                                        df_points_coords = clustering.calcul_clusters_meanshift(df_points_coords, clustering_length, iteration_params)
+                                                    elif clustering_type == 'spectral':
+                                                        df_points_coords = clustering.calcul_clusters_spectral(df_points_coords, clustering_length, iteration_params)
+                                                    elif clustering_type == 'agglomerative':
+                                                        df_points_coords = clustering.calcul_clusters_agglomerative(df_points_coords, clustering_length, iteration_params)
+                                                    elif clustering_type == 'optics':
+                                                        df_points_coords = clustering.calcul_clusters_optics(df_points_coords, clustering_length, iteration_params)
+                                                    elif clustering_type == 'birch':
+                                                        df_points_coords = clustering.calcul_clusters_birch(df_points_coords, clustering_length, iteration_params)
+
+                                                    # st.text(f"{clustering_type} - {layers_count}")
+                                                    # st.dataframe(df_points_coords)
 
                                                     save_layer(
                                                         conn,
@@ -166,77 +217,78 @@ with tab_create:
                                                     )
 
                                                     if df_points_coords.shape[0] > clustering_length:
-                                                        df_points_coords = calcul_centroids(df_points_coords)
+                                                        df_points_coords = clustering.calcul_centroids(df_points_coords)
                                                         df_points_coords, df_points_distances = calcul_distances(df_points_coords)
 
                                                         layers_count += 1
                                                     else:
                                                         break
                                         n_combination += 1
+                                n_clustering += 1
 
-                        conn.commit()
+                    conn.commit()
 
-                        with st.spinner(f"Calcul des chemins", show_time=True):
-                            configurations = session.scalars(
-                                select(Configuration) \
-                                    .filter(Configuration.batch_id == batch_id) \
-                                    .order_by(Configuration.id)
-                            ).all()
+                    with st.spinner(f"Calcul des chemins", show_time=True):
+                        configurations = session.scalars(
+                            select(Configuration) \
+                                .filter(Configuration.batch_id == batch_id) \
+                                .order_by(Configuration.id)
+                        ).all()
 
-                            n_configuration = 1
+                        n_configuration = 1
 
-                            for configuration in configurations:
-                                with st.spinner(f"{configuration!r} - Calcul {n_configuration} / {len(configurations)}", show_time=True):
-                                    layers = session.scalars(
-                                        select(Layer)\
-                                        .filter(Layer.configuration_id == configuration.id)\
-                                        .order_by(Layer.level)
-                                    ).all()
+                        for configuration in configurations:
+                            with st.spinner(f"{configuration!r} - Calcul {n_configuration} / {len(configurations)}", show_time=True):
+                                layers = session.scalars(
+                                    select(Layer)\
+                                    .filter(Layer.configuration_id == configuration.id)\
+                                    .order_by(Layer.level)
+                                ).all()
 
-                                    df_centroids = None
-                                    n_layer = 1
+                                df_centroids = None
+                                n_layer = 1
 
-                                    for layer in layers[::-1]:
-                                        with st.spinner(f"Calcul de la couche {n_layer} / {len(layers)}", show_time=True):
-                                            df_cluster = None
-                                            df_points_coords = layer.get_points()
-                                            df_points_distances = get_distances(layer)
+                                for layer in layers[::-1]:
+                                    with st.spinner(f"Calcul de la couche {n_layer} / {len(layers)}", show_time=True):
+                                        df_cluster = None
+                                        df_points_coords = layer.get_points()
+                                        df_points_distances = get_distances(layer)
 
-                                            if df_centroids is None:
-                                                df_centroids = calcul_centroids(
-                                                    df_points_coords,
-                                                )
+                                        if df_centroids is None:
+                                            df_centroids = clustering.calcul_centroids(
+                                                df_points_coords,
+                                            )
 
-                                            if df_centroids.shape[0] < BEST_PATH_MAX_CLUSTERS:
-                                                # Le meilleur chemin est calculé par rapport aux groupes précédents
-                                                df_cluster = best_path(df_centroids, df_points_coords, df_points_distances)
+                                        if df_centroids.shape[0] < BEST_PATH_MAX_CLUSTERS:
+                                            # Le meilleur chemin est calculé par rapport aux groupes précédents
+                                            df_cluster = best_path(df_centroids, df_points_coords, df_points_distances)
 
-                                            if df_cluster is None:
-                                                df_cluster = sort_points_by_cluster(df_centroids, df_points_coords)
+                                        if df_cluster is None:
+                                            df_cluster = sort_points_by_cluster(df_centroids, df_points_coords)
 
-                                            # Le min local est calculé indépedemment des groupes
-                                            df_cluster = calcul_min_local_path(df_cluster, df_points_distances)
+                                        # Le min local est calculé indépedemment des groupes
+                                        df_cluster = calcul_min_local_path(df_cluster, df_points_distances)
 
-                                            for _, row_point in df_cluster.iterrows():
-                                                point = session.query(Point) \
-                                                    .filter(Point.layer_id == layer.id) \
-                                                    .filter(Point.code == row_point['code']) \
-                                                    .update({
-                                                    'code_next' : row_point['code_next'],
-                                                    'lat_next'  : row_point['lat_next'],
-                                                    'lng_next'  : row_point['lng_next'],
-                                                    'distance'  : row_point['distance'],
-                                                })
+                                        for _, row_point in df_cluster.iterrows():
+                                            point = session.query(Point) \
+                                                .filter(Point.layer_id == layer.id) \
+                                                .filter(Point.code == row_point['code']) \
+                                                .update({
+                                                'code_next' : row_point['code_next'],
+                                                'lat_next'  : row_point['lat_next'],
+                                                'lng_next'  : row_point['lng_next'],
+                                                'distance'  : row_point['distance'],
+                                            })
 
-                                            df_centroids = df_cluster[['code', 'lat', 'lng', 'x', 'y', 'cluster']]
+                                        df_centroids = df_cluster[['code', 'lat', 'lng', 'x', 'y', 'cluster']]
 
-                                        n_layer += 1
+                                    n_layer += 1
 
-                                    configuration.distance_min = float(df_cluster['distance'].sum())
+                                configuration.distance_min = float(df_cluster['distance'].sum())
 
-                                n_configuration += 1
+                            n_configuration += 1
 
-                            session.commit()
+                        session.commit()
 
                     if batch_id is not None:
                         goto_page_object('batch', 'batch_id', batch_id)
