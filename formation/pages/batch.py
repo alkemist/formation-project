@@ -20,11 +20,12 @@ st_configurations = select(Batch, Configuration, Layer) \
     .order_by(Configuration.id)
 
 df_configurations = pd.read_sql(st_configurations, engine)\
-    [['clustering_type', 'clustering_length', 'clustering_params', 'distance_min', 'id_1', 'id_2']]\
+    [['clustering_type', 'clustering_length', 'clustering_rollback', 'clustering_params', 'distance_min', 'id_1', 'id_2']]\
     .groupby(['id_1']) \
     .agg(
         clustering_type=('clustering_type', 'first'),
         clustering_length=('clustering_length', 'first'),
+        clustering_rollback=('clustering_rollback', 'first'),
         clustering_params=('clustering_params', 'first'),
         distance_min=('distance_min', 'first'),
         count=('id_2', 'nunique'),
@@ -64,6 +65,9 @@ table_event = st.dataframe(
         ),
         "clustering_length": st.column_config.NumberColumn(
             'Longueur',
+        ),
+        "clustering_rollback": st.column_config.NumberColumn(
+            'Rollbacks',
         ),
         "clustering_params": st.column_config.JsonColumn(
             'Paramètres',

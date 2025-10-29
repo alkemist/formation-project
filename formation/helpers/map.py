@@ -5,7 +5,7 @@ from sqlalchemy import select, or_, and_
 import streamlit as st
 
 from formation import engine
-from formation.data.constants import MAX_ROLLBACK_CALCUL_MIN_PATH, BEST_PATH_MAX_COMBINATIONS
+from formation.data.constants import BEST_PATH_MAX_COMBINATIONS
 from formation.models import Point, Layer
 from formation.models.distance import Distance
 from itertools import combinations, permutations, product
@@ -299,14 +299,14 @@ def sort_points_by_cluster(df_centroids: pd.DataFrame, df_points: pd.DataFrame) 
 
     return df_points
 
-def calcul_min_local_path(df_points: pd.DataFrame, df_points_distances: pd.DataFrame) -> pd.DataFrame:
+def calcul_min_local_path(df_points: pd.DataFrame, df_points_distances: pd.DataFrame, max_rollback: int) -> pd.DataFrame:
     n = 0
 
     df_points = calc_next(df_points, df_points_distances)
     distance_total_prev = float(df_points['distance'].sum())
 
     while True:
-        df_points, distance_total = min_local_path(df_points, df_points_distances, n)
+        df_points, distance_total = min_local_path(df_points, df_points_distances, max_rollback, n)
 
         gap = distance_total_prev - distance_total
         distance_total_prev = distance_total
@@ -318,9 +318,9 @@ def calcul_min_local_path(df_points: pd.DataFrame, df_points_distances: pd.DataF
 
     return df_points
 
-def min_local_path(df_points: pd.DataFrame, df_points_distances: pd.DataFrame, n) -> (pd.DataFrame, float):
+def min_local_path(df_points: pd.DataFrame, df_points_distances: pd.DataFrame, max_rollback: int, n) -> (pd.DataFrame, float):
     distance_total = float(df_points['distance'].sum())
-    indexes_prev = df_points.index[-MAX_ROLLBACK_CALCUL_MIN_PATH:].tolist()[::-1]
+    indexes_prev = (df_points.index[-max_rollback:] if max_rollback < df_points.shape[0] else df_points.index).tolist()[::-1]
 
     with st.spinner(f'- [Etape 4.{n}] avec {df_points.shape[0]} points et une distance min de {distance_total}', show_time=True):
         for index_current, point in df_points.iterrows():

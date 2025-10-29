@@ -17,12 +17,13 @@ class Configuration(Base):
 
     clustering_type = Column(String)
     clustering_length = Column(Integer)
+    clustering_rollback = Column(Integer)
     clustering_params: Mapped[Optional[JSON]] = mapped_column(type_=JSON)
 
     distance_min = Column(Integer)
 
     def __repr__(self) -> str:
-        str_repr = f"{self.batch!r} - Configuration {self.clustering_type} de taille {self.clustering_length}"
+        str_repr = f"{self.batch!r} - Configuration {self.clustering_type} {self.clustering_length} : {self.clustering_rollback}"
         if self.clustering_params != {}:
             str_repr = f"{str_repr} et avec comme paramètres {self.clustering_params!r}"
 
